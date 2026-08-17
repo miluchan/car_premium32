@@ -132,8 +132,13 @@ function PaymentBarcodePage({ record }) {
   const barcodeRef3 = useRef(null);
 
   useEffect(() => {
-    if (!record || !window.JsBarcode) return;
-    try {
+    if (!record) return;
+    const drawBarcodes = () => {
+      if (!window.JsBarcode) {
+        setTimeout(drawBarcodes, 200);
+        return;
+      }
+      try {
       window.JsBarcode(barcodeRef1.current, record.quoteId, {
         format: "CODE128",
         displayValue: true,
@@ -152,7 +157,9 @@ function PaymentBarcodePage({ record }) {
         fontSize: 14,
         height: 50,
       });
-    } catch (e) {}
+      } catch (e) {}
+    };
+    drawBarcodes();
   }, [record]);
 
   if (!record) {
