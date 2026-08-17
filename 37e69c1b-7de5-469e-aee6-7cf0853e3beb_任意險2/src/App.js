@@ -157,8 +157,10 @@ function PaymentBarcodePage({ record }) {
         fontSize: 14,
         height: 50,
       });
-      } catch (e) {}
-    };
+    } catch (e) {
+      alert("條碼繪製失敗：" + e.message);
+    }
+  };
     drawBarcodes();
   }, [record]);
 
