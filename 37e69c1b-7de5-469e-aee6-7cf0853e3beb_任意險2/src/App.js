@@ -126,6 +126,76 @@ const generatePaymentText = (name, plate, total, qid) => {
     link
   );
 };
+function PaymentBarcodePage({ record }) {
+  const barcodeRef1 = useRef(null);
+  const barcodeRef2 = useRef(null);
+  const barcodeRef3 = useRef(null);
+
+  useEffect(() => {
+    if (!record || !window.JsBarcode) return;
+    try {
+      window.JsBarcode(barcodeRef1.current, record.quoteId, {
+        format: "CODE128",
+        displayValue: true,
+        fontSize: 14,
+        height: 50,
+      });
+      window.JsBarcode(barcodeRef2.current, String(record.totalPremium), {
+        format: "CODE128",
+        displayValue: true,
+        fontSize: 14,
+        height: 50,
+      });
+      window.JsBarcode(barcodeRef3.current, record.dueDate, {
+        format: "CODE128",
+        displayValue: true,
+        fontSize: 14,
+        height: 50,
+      });
+    } catch (e) {}
+  }, [record]);
+
+  if (!record) {
+    return (
+      <div className="container p-4 text-center min-vh-100 d-flex align-items-center justify-content-center bg-white">
+        <div className="text-muted">⏳ 正在連線雲端提取繳費資訊...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container p-0 min-vh-100 bg-white d-flex align-items-center justify-content-center">
+      <div className="w-100" style={{ maxWidth: "420px" }}>
+        <div className="bg-danger text-white text-center py-3 fw-bold fs-5">
+          產險保費繳款條碼
+        </div>
+        <div className="bg-light text-center py-3 px-3 border-bottom">
+          <div className="fs-5 fw-bold mb-2">
+            報價編號：
+            <span className="text-primary">{record.quoteId}</span>
+          </div>
+          <div className="mb-1">被保險人：{record.clientName}</div>
+          <div className="mb-1">牌照號碼：{record.carNumber}</div>
+          <div className="mb-1">
+            繳款金額：NT$ {record.totalPremium.toLocaleString()}
+          </div>
+          <div>繳費期限：{record.dueDate}</div>
+        </div>
+        <div className="text-center py-4">
+          <svg ref={barcodeRef1} className="mb-3"></svg>
+          <br />
+          <svg ref={barcodeRef2} className="mb-3"></svg>
+          <br />
+          <svg ref={barcodeRef3}></svg>
+        </div>
+        <div className="bg-danger text-white text-center py-2 small">
+          7-ELEVEN、全家、萊爾富、OK便利商店
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [historyQuotes, setHistoryQuotes] = useState([]);
   const [brandOptions, setBrandOptions] = useState([]);
@@ -453,6 +523,38 @@ export default function App() {
   useEffect(() => {
     if (!hasLiability) setHasExcess(false);
   }, [hasLiability]);
+ // 💳 客戶點「繳費」連結進來，抓取該筆報價的繳費資訊
+ useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const payId = params.get("payId");
+  if (payId) {
+    const fetchPaymentInfo = async () => {
+      try {
+        const { data, error } = await supabaseClient
+          .from("insurance_quotations")
+          .select("*")
+          .eq("quotation_no", payId)
+          .single();
+        if (!error && data) {
+          const snap = data.ui_state_snapshot || {};
+          const dueDate =
+            parseInt(snap.compulsoryStartDate) <=
+            parseInt(snap.arbitraryStartDate)
+              ? snap.compulsoryStartDate
+              : snap.arbitraryStartDate;
+          setPaymentPageRecord({
+            quoteId: data.quotation_no,
+            clientName: data.client_name,
+            carNumber: data.plate_no,
+            totalPremium: data.total_premium || 0,
+            dueDate: dueDate || "-",
+          });
+        }
+      } catch (e) {}
+    };
+    fetchPaymentInfo();
+  }
+}, [window.location.search]); 
   // 🚀 智慧型網址單號強行攔截大腦 (內聯合體：100% 解決客戶端姓名與保費漏同步、卡在提取中的缺陷)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1164,6 +1266,9 @@ export default function App() {
   // ====================================================================
   // 🎯 物理防禦雙視圖分流：當客戶點連結進來，直接滿版遮斷，背景絕對全白不穿透！
   // ====================================================================
+  if (window.location.search.includes("payId")) {
+    return <PaymentBarcodePage record={paymentPageRecord} />;
+  }
   if (window.location.search.includes("signId")) {
     if (isSigned) {
       return (
@@ -2612,3 +2717,4 @@ export default function App() {
     </div>
   );
 } // ⚠️ 鋼鐵終極封頂結尾大括號！
+
