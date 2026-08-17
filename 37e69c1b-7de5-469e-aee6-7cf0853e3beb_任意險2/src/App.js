@@ -112,6 +112,20 @@ const generatePromoText = (type, name, plate, total, qid) => {
     link
   );
 };
+const generatePaymentText = (name, plate, total, qid) => {
+  const currentDomain = window.location.origin;
+  const link = currentDomain + "/?payId=" + qid;
+  return (
+    "【投保通知】親愛的 " +
+    name +
+    " 您好，您愛車 " +
+    plate +
+    " 的汽車險報價已精算完成，總金額為 NT$ " +
+    total.toLocaleString() +
+    " 元，並至便利商店繳費：" +
+    link
+  );
+};
 export default function App() {
   const [historyQuotes, setHistoryQuotes] = useState([]);
   const [brandOptions, setBrandOptions] = useState([]);
@@ -162,6 +176,7 @@ export default function App() {
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [downloadDocType, setDownloadDocType] = useState("mobile_sign_consent");
   const [showQueryModal, setShowQueryModal] = useState(false);
+  const [paymentPageRecord, setPaymentPageRecord] = useState(null);
   const [queryRecord, setQueryRecord] = useState(null);
 
   useEffect(() => {
@@ -999,6 +1014,22 @@ export default function App() {
   // ==========================================
   // 🚀 3. 三軌通訊外發渠道 (💡 修正問題 5：精確對齊內文變數，100% 絕對強制外彈信箱)
   // ==========================================
+  const triggerPaymentSend = (item) => {
+    const dueDate =
+      parseInt(item.compulsoryStartDate) <= parseInt(item.arbitraryStartDate)
+        ? item.compulsoryStartDate
+        : item.arbitraryStartDate;
+    const messageText = generatePaymentText(
+      item.clientName,
+      item.carNumber,
+      item.totalPremium,
+      item.quoteId
+    );
+    navigator.clipboard.writeText(messageText).catch(() => {});
+    const lineUrl =
+      "https://line.me/R/msg/text/?" + encodeURIComponent(messageText);
+    window.open(lineUrl, "_blank");
+  };
   const triggerSendAction = (channel, item) => {
     const messageText = generatePromoText(
       channel,
@@ -2417,6 +2448,7 @@ export default function App() {
                       <th>任意保費</th>
                       <th>總保費</th>
                       <th>狀態</th>
+                      <th>操作</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2438,8 +2470,8 @@ export default function App() {
                         </td>
                         <td>{q.vehicle}</td>
                         {/* 🎯 修正：讀取正確變數，起保日與到期日一秒大復活 */}
-                        <td>{q.startDate}</td>
-                        <td>{q.endDate}</td>
+                        <td>{q.compulsoryStartDate}</td>
+                        <td>{q.compulsoryEndDate}</td>
                         <td className="text-warning fw-bold">
                           ${q.compulsoryPremium?.toLocaleString()}
                         </td>
@@ -2453,6 +2485,29 @@ export default function App() {
                           <span className="badge bg-warning text-dark">
                             {q.status}
                           </span>
+                        </td>
+                        <td>
+                          <div className="d-flex gap-1 justify-content-center">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-light"
+                              onClick={() => {
+                                setQueryRecord(q);
+                                setShowQueryModal(true);
+                              }}
+                            >
+                              🔍
+                            </button>
+                            {q.status === "已簽署" && (
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-success"
+                                onClick={() => triggerPaymentSend(q)}
+                              >
+                                💳
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
