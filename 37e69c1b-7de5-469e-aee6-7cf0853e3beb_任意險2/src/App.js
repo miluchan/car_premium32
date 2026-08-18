@@ -1037,6 +1037,10 @@ export default function App() {
 
   // 🚀 2. 精算並儲存報價單 (💡 修正問題 5：跨日期偵測流水序號強制從 00001 重頭開始)
   const handleSave = async () => {
+    if (!phone) {
+      alert("⚠️ 行動電話為必填欄位，請填寫後再試算並儲存報價單。");
+      return;
+    }
     if (!clientName || !carNumber) {
       alert("請填寫姓名與車號！");
       return;
@@ -1415,7 +1419,8 @@ export default function App() {
             <div className="fw-bold mb-1 text-dark">核定明細：</div>
             <div>客戶姓名：{clientName || "核定客戶"}</div>
             <div>車牌號碼：{carNumber || "QQQ-222"}</div>
-            <div>車種項目：{vehicle || "03:自小客"}</div>
+            <div className="mb-1">車種項目：{vehicle || "03:自小客"}</div>
+            <div className="mb-1">聯絡電話：{activeSignRecord?.phone || "未提供"}</div>
             <div
               className="text-danger fw-bold mt-2"
               style={{ fontSize: "1rem" }}
@@ -2927,7 +2932,8 @@ export default function App() {
                 <div className="fw-bold mb-1 text-dark">核定明細：</div>
                 <div>客戶姓名：{clientName || "核定客戶"}</div>
                 <div>車牌號碼：{carNumber || "QQQ-222"}</div>
-                <div>車種項目：{vehicle || "03:自小客"}</div>
+                <div className="mb-1">車種項目：{vehicle || "03:自小客"}</div>
+            <div className="mb-1">聯絡電話：{activeSignRecord?.phone || "未提供"}</div>
                 <div
                   className="text-danger fw-bold mt-2"
                   style={{ fontSize: "1rem" }}
