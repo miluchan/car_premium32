@@ -133,8 +133,14 @@ function PaymentBarcodePage({ record }) {
 
   useEffect(() => {
     if (!record) return;
+    let retryCount = 0;
     const drawBarcodes = () => {
       if (!window.JsBarcode) {
+        retryCount++;
+        if (retryCount > 25) {
+          alert("條碼套件載入逾時，可能是網路環境擋住了外部資源");
+          return;
+        }
         setTimeout(drawBarcodes, 200);
         return;
       }
