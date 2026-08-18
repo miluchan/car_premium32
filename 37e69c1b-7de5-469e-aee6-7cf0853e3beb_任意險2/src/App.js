@@ -1041,6 +1041,36 @@ export default function App() {
           amount: passengerPremium,
         });
 
+        await supabaseClient.from("quote_full_records").insert([
+          {
+            quotation_no: qid,
+            client_name: clientName,
+            phone: phone,
+            client_email: clientEmail,
+            birthday: birthday,
+            gender: gender,
+            plate_no: carNumber,
+            vehicle_type_display: vehicle,
+            brand_series: mergedBrandSeries,
+            model_code: modelCode,
+            engine_displacement: engineDisplacement,
+            replacement_value: replacementValue,
+            manufacture_date: manufactureDate,
+            issue_date: issueDate,
+            compulsory_start_date: startDate,
+            compulsory_end_date: endDateCompulsory,
+            arbitrary_start_date: startDateArbitrary,
+            arbitrary_end_date: endDateArbitrary,
+            coverage_items: coverageItems,
+            compulsory_premium: compulsoryPremium,
+            arbitrary_premium: arbitraryPremium,
+            total_premium: totalPremium,
+            sign_status: "待簽署",
+            payment_status: "未繳費",
+            otp_verified: false,
+          },
+        ]);
+
       await supabaseClient.from("insurance_quotations").insert([
         {
           quotation_no: qid,
@@ -1252,9 +1282,17 @@ export default function App() {
 
     if (activeSignRecord) {
       try {
+        const signatureImage = canvas.toDataURL("image/png");
         await supabaseClient
           .from("insurance_quotations")
           .update({ status: "已簽署" })
+          .eq("quotation_no", activeSignRecord.quoteId);
+        await supabaseClient
+          .from("quote_full_records")
+          .update({
+            signature_image: signatureImage,
+            sign_status: "已簽署",
+          })
           .eq("quotation_no", activeSignRecord.quoteId);
         setHistoryQuotes((prev) =>
           prev.map((q) =>
