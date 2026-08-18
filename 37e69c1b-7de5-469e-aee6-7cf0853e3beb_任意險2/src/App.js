@@ -1066,6 +1066,8 @@ export default function App() {
             client_email: clientEmail,
             birthday: birthday,
             gender: gender,
+            passenger_count: passengerCount,
+            passenger_unit: passengerUnit,
             plate_no: carNumber,
             vehicle_type_display: vehicle,
             brand_series: mergedBrandSeries,
@@ -2564,11 +2566,13 @@ export default function App() {
                     <div className="col-6"><span className="text-muted">報價編號：</span><span className="font-monospace fw-bold">{queryRecord.quotation_no}</span></div>
                     <div className="col-6"><span className="text-muted">簽署狀態：</span><span className="fw-bold">{queryRecord.sign_status}</span></div>
                     <div className="col-6"><span className="text-muted">客戶姓名：</span>{queryRecord.client_name}</div>
+                    <div className="col-6"><span className="text-muted">性別：</span>{queryRecord.gender || "-"}</div>
                     <div className="col-6"><span className="text-muted">車牌號碼：</span>{queryRecord.plate_no}</div>
                     <div className="col-6"><span className="text-muted">車種：</span>{queryRecord.vehicle_type_display}</div>
                     <div className="col-6"><span className="text-muted">廠牌車系：</span>{queryRecord.brand_series || "-"}</div>
                     <div className="col-6"><span className="text-muted">排氣量：</span>{queryRecord.engine_displacement || "-"}</div>
                     <div className="col-6"><span className="text-muted">重置價格：</span>{queryRecord.replacement_value || "-"} 萬</div>
+                    <div className="col-6"><span className="text-muted">乘載量：</span>{queryRecord.passenger_count || "-"} {queryRecord.passenger_unit || ""}</div>
                     <div className="col-6"><span className="text-muted">強制保期：</span>{queryRecord.compulsory_start_date} ~ {queryRecord.compulsory_end_date}</div>
                     <div className="col-6"><span className="text-muted">任意保期：</span>{queryRecord.arbitrary_start_date} ~ {queryRecord.arbitrary_end_date}</div>
                     <div className="col-6"><span className="text-muted">聯絡電話：</span>{queryRecord.phone || "-"}</div>
