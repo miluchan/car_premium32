@@ -1455,13 +1455,21 @@ export default function App() {
                   {otpVerified ? "✅ OTP 身分驗證已通過" : "⚠️ 尚未完成 OTP 身分驗證"}
                 </span>
                 <button
-                  type="button"
-                  className="btn btn-sm btn-outline-primary"
-                  onClick={() => setShowOtpModal(true)}
-                  disabled={otpVerified}
-                >
-                  {otpVerified ? "已驗證" : "OTP驗證"}
-                </button>
+              type="button"
+              className="btn btn-sm btn-outline-primary"
+              onClick={() => {
+                if (!activeSignRecord?.phone) {
+                  alert(
+                    "⚠️ 無法進行 OTP 驗證：這筆報價單沒有留存客戶行動電話。\n請經辦人員回到報價系統，補上行動電話後重新試算並儲存，才能進行 OTP 驗證。"
+                  );
+                  return;
+                }
+                setShowOtpModal(true);
+              }}
+              disabled={otpVerified}
+            >
+              {otpVerified ? "已驗證" : "OTP驗證"}
+            </button>
               </div>
               <div className="d-flex gap-2 mb-3">
                 <button
@@ -1581,15 +1589,7 @@ export default function App() {
             <option value="噸">噸</option>
           </select>
         </div>
-        <div className="col-6">
-          行動電話
-          <input
-            type="text"
-            className="form-control bg-white"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-          />
-        </div>
+        <div className="col-6">行動電話<span className="text-danger">（必填）</span><input type="text" className="form-control bg-white border-secondary-subtle" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
         <div className="col-6">
           E-mail
           <input
@@ -2969,7 +2969,15 @@ export default function App() {
             <button
               type="button"
               className="btn btn-sm btn-outline-primary"
-              onClick={() => setShowOtpModal(true)}
+              onClick={() => {
+                if (!activeSignRecord?.phone) {
+                  alert(
+                    "⚠️ 無法進行 OTP 驗證：這筆報價單沒有留存客戶行動電話。\n請經辦人員回到報價系統，補上行動電話後重新試算並儲存，才能進行 OTP 驗證。"
+                  );
+                  return;
+                }
+                setShowOtpModal(true);
+              }}
               disabled={otpVerified}
             >
               {otpVerified ? "已驗證" : "OTP驗證"}
