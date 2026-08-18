@@ -261,6 +261,35 @@ export default function App() {
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [downloadDocType, setDownloadDocType] = useState("mobile_sign_consent");
   const [showQueryModal, setShowQueryModal] = useState(false);
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpPhase, setOtpPhase] = useState("send");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpInput, setOtpInput] = useState("");
+  const [otpVerified, setOtpVerified] = useState(false);
+
+  const sendOtpCode = () => {
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    setOtpCode(code);
+    setOtpPhase("verify");
+    alert(
+      "📱（模擬簡訊發送）驗證碼已發送至 " +
+        (activeSignRecord?.phone || "客戶手機") +
+        "\n\n測試用驗證碼：" +
+        code
+    );
+  };
+
+  const verifyOtpCode = () => {
+    if (otpInput === otpCode) {
+      setOtpVerified(true);
+      alert("✅ OTP 身分驗證成功！現在可以送出簽名確認書。");
+      setShowOtpModal(false);
+      setOtpPhase("send");
+      setOtpInput("");
+    } else {
+      alert("❌ 驗證碼錯誤，請重新輸入");
+    }
+  };
   const [queryLoading, setQueryLoading] = useState(false);
   const openQueryModal = async (qid) => {
     setShowQueryModal(true);
@@ -606,12 +635,14 @@ export default function App() {
             setCompulsoryPremium(data.forced_premium || 0);
             setArbitraryPremium(data.arbitrary_premium || 0);
             setTotalPremium(data.total_premium || 0);
+            const snap = data.ui_state_snapshot || {};
             setActiveSignRecord({
               quoteId: data.quotation_no,
               clientName: data.client_name,
               carNumber: data.plate_no,
               vehicle: data.vehicle_type_display,
               totalPremium: data.total_premium,
+              phone: snap.phone,
             });
             setShowSignModal(true); // 💡 網址參數有 signId 時，強制點火彈出手寫簽名畫面！
           }
@@ -1306,11 +1337,12 @@ export default function App() {
           .from("insurance_quotations")
           .update({ status: "已簽署" })
           .eq("quotation_no", activeSignRecord.quoteId);
-        await supabaseClient
+          await supabaseClient
           .from("quote_full_records")
           .update({
             signature_image: signatureImage,
             sign_status: "已簽署",
+            otp_verified: true,
           })
           .eq("quotation_no", activeSignRecord.quoteId);
         setHistoryQuotes((prev) =>
@@ -1414,22 +1446,40 @@ export default function App() {
             onTouchMove={draw}
             onTouchEnd={stopDrawing}
           />
-          <div className="d-flex gap-2 mb-3">
-            <button
-              type="button"
-              className="btn btn-outline-secondary w-50 fw-bold"
-              onClick={clearCanvas}
-            >
-              清除重簽
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary w-50 fw-bold"
-              onClick={submitSignature}
-            >
-              確認送出確認書
-            </button>
-          </div>
+              <div
+                className={`d-flex justify-content-between align-items-center rounded-2 p-2 mb-3 ${
+                  otpVerified ? "bg-success bg-opacity-10" : "bg-warning bg-opacity-10"
+                }`}
+              >
+                <span className="small fw-bold">
+                  {otpVerified ? "✅ OTP 身分驗證已通過" : "⚠️ 尚未完成 OTP 身分驗證"}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-primary"
+                  onClick={() => setShowOtpModal(true)}
+                  disabled={otpVerified}
+                >
+                  {otpVerified ? "已驗證" : "OTP驗證"}
+                </button>
+              </div>
+              <div className="d-flex gap-2 mb-3">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary w-50 fw-bold py-2"
+                  onClick={clearCanvas}
+                >
+                  清除重簽
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary w-50 fw-bold py-2"
+                  onClick={submitSignature}
+                  disabled={!otpVerified}
+                >
+                  確認送出確認書
+                </button>
+              </div>
           <div className="text-center text-muted small border-top pt-2">
             🔒 本手寫電子簽章受商用加密協議保護。
           </div>
@@ -2134,6 +2184,7 @@ export default function App() {
                         className="btn btn-primary btn-sm px-2 fw-bold"
                         onClick={() => {
                           setActiveSignRecord(q);
+                          setOtpVerified(false);
                           setClientName(q.clientName);
                           setCarNumber(q.carNumber);
                           setVehicle(q.vehicle);
@@ -2479,6 +2530,74 @@ export default function App() {
                     此險種尚未勾選或尚未試算
                   </div>
                 )}
+            </div>
+          </div>
+        </div>
+      )}
+      {showOtpModal && (
+        <div
+          className="modal d-block show bg-black bg-opacity-75"
+          style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", zIndex: 1090, overflowY: "auto" }}
+        >
+          <div className="d-flex align-items-center justify-content-center min-vh-100 p-3">
+            <div className="bg-white rounded-3 p-4 shadow-lg" style={{ maxWidth: "400px", width: "100%" }}>
+              <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                <h6 className="fw-bold text-primary mb-0">📱 OTP 身分驗證</h6>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowOtpModal(false);
+                    setOtpPhase("send");
+                    setOtpInput("");
+                  }}
+                />
+              </div>
+
+              {otpPhase === "send" && (
+                <>
+                  <p className="small text-muted">
+                    將發送驗證碼至客戶手機：
+                    <span className="fw-bold text-dark">{activeSignRecord?.phone || "（查無電話號碼）"}</span>
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-primary w-100 fw-bold"
+                    disabled={!activeSignRecord?.phone}
+                    onClick={sendOtpCode}
+                  >
+                    發送驗證碼
+                  </button>
+                </>
+              )}
+
+              {otpPhase === "verify" && (
+                <>
+                  <p className="small text-muted">請輸入客戶收到的 6 位數驗證碼：</p>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    className="form-control mb-3 text-center fs-4 font-monospace"
+                    value={otpInput}
+                    onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ""))}
+                    placeholder="------"
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-primary w-100 fw-bold mb-2"
+                    onClick={verifyOtpCode}
+                  >
+                    確認驗證
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-link w-100 btn-sm"
+                    onClick={sendOtpCode}
+                  >
+                    重新發送驗證碼
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -2839,22 +2958,40 @@ export default function App() {
                 onTouchMove={draw}
                 onTouchEnd={stopDrawing}
               />
-              <div className="d-flex gap-2 mb-3">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary w-50 fw-bold py-2"
-                  onClick={clearCanvas}
-                >
-                  清除重簽
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary w-50 fw-bold py-2"
-                  onClick={submitSignature}
-                >
-                  確認送出確認書
-                </button>
-              </div>
+          <div
+            className={`d-flex justify-content-between align-items-center rounded-2 p-2 mb-3 ${
+              otpVerified ? "bg-success bg-opacity-10" : "bg-warning bg-opacity-10"
+            }`}
+          >
+            <span className="small fw-bold">
+              {otpVerified ? "✅ OTP 身分驗證已通過" : "⚠️ 尚未完成 OTP 身分驗證"}
+            </span>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-primary"
+              onClick={() => setShowOtpModal(true)}
+              disabled={otpVerified}
+            >
+              {otpVerified ? "已驗證" : "OTP驗證"}
+            </button>
+          </div>
+          <div className="d-flex gap-2 mb-3">
+            <button
+              type="button"
+              className="btn btn-outline-secondary w-50 fw-bold"
+              onClick={clearCanvas}
+            >
+              清除重簽
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary w-50 fw-bold"
+              onClick={submitSignature}
+              disabled={!otpVerified}
+            >
+              確認送出確認書
+            </button>
+          </div>
               <button
                 type="button"
                 className="btn btn-secondary btn-sm w-100 fw-bold py-2"
