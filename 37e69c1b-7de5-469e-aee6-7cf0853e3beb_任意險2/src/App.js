@@ -261,6 +261,23 @@ export default function App() {
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [downloadDocType, setDownloadDocType] = useState("mobile_sign_consent");
   const [showQueryModal, setShowQueryModal] = useState(false);
+  const [queryLoading, setQueryLoading] = useState(false);
+  const openQueryModal = async (qid) => {
+    setShowQueryModal(true);
+    setQueryLoading(true);
+    setQueryRecord(null);
+    try {
+      const { data, error } = await supabaseClient
+        .from("quote_full_records")
+        .select("*")
+        .eq("quotation_no", qid)
+        .single();
+      if (!error && data) {
+        setQueryRecord(data);
+      }
+    } catch (e) {}
+    setQueryLoading(false);
+  };
   const [paymentPageRecord, setPaymentPageRecord] = useState(null);
   const [queryRecord, setQueryRecord] = useState(null);
 
@@ -2128,8 +2145,7 @@ export default function App() {
                         type="button"
                         className="btn btn-sm btn-outline-dark"
                         onClick={() => {
-                          setQueryRecord(q);
-                          setShowQueryModal(true);
+                          openQueryModal(q.quoteId);
                         }}
                       >
                         🔍
@@ -2522,7 +2538,90 @@ export default function App() {
               <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
                 <h6 className="fw-bold text-primary mb-0">📄 報價內容確認</h6>
                 <button type="button" className="btn-close" onClick={() => setShowQueryModal(false)} />
+                {showQueryModal && (
+        <div
+          className="modal d-block show bg-black bg-opacity-75"
+          style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", zIndex: 1080, overflowY: "auto" }}
+        >
+          <div className="d-flex align-items-center justify-content-center min-vh-100 p-3">
+            <div className="bg-white rounded-3 p-4 shadow-lg" style={{ maxWidth: "560px", width: "100%" }}>
+              <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                <h6 className="fw-bold text-primary mb-0">📄 報價內容確認</h6>
+                <button type="button" className="btn-close" onClick={() => setShowQueryModal(false)} />
               </div>
+
+              {queryLoading && (
+                <div className="text-center text-muted py-4">⏳ 讀取中...</div>
+              )}
+
+              {!queryLoading && !queryRecord && (
+                <div className="text-center text-muted py-4">查無這筆報價的詳細資料</div>
+              )}
+
+              {!queryLoading && queryRecord && (
+                <>
+                  <div className="row g-2 small mb-3">
+                    <div className="col-6"><span className="text-muted">報價編號：</span><span className="font-monospace fw-bold">{queryRecord.quotation_no}</span></div>
+                    <div className="col-6"><span className="text-muted">簽署狀態：</span><span className="fw-bold">{queryRecord.sign_status}</span></div>
+                    <div className="col-6"><span className="text-muted">客戶姓名：</span>{queryRecord.client_name}</div>
+                    <div className="col-6"><span className="text-muted">車牌號碼：</span>{queryRecord.plate_no}</div>
+                    <div className="col-6"><span className="text-muted">車種：</span>{queryRecord.vehicle_type_display}</div>
+                    <div className="col-6"><span className="text-muted">廠牌車系：</span>{queryRecord.brand_series || "-"}</div>
+                    <div className="col-6"><span className="text-muted">排氣量：</span>{queryRecord.engine_displacement || "-"}</div>
+                    <div className="col-6"><span className="text-muted">重置價格：</span>{queryRecord.replacement_value || "-"} 萬</div>
+                    <div className="col-6"><span className="text-muted">強制保期：</span>{queryRecord.compulsory_start_date} ~ {queryRecord.compulsory_end_date}</div>
+                    <div className="col-6"><span className="text-muted">任意保期：</span>{queryRecord.arbitrary_start_date} ~ {queryRecord.arbitrary_end_date}</div>
+                    <div className="col-6"><span className="text-muted">聯絡電話：</span>{queryRecord.phone || "-"}</div>
+                    <div className="col-6"><span className="text-muted">E-mail：</span>{queryRecord.client_email || "-"}</div>
+                    <div className="col-6"><span className="text-muted">繳費狀態：</span>{queryRecord.payment_status}</div>
+                    <div className="col-6"><span className="text-muted">OTP驗證：</span>{queryRecord.otp_verified ? "✅ 已驗證" : "未驗證"}</div>
+                  </div>
+
+                  <table className="table table-sm table-bordered small mb-3">
+                    <thead className="table-light">
+                      <tr>
+                        <th style={{ width: "50px" }}>代號</th>
+                        <th>保險種類</th>
+                        <th className="text-end" style={{ width: "110px" }}>保險費(元)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(queryRecord.coverage_items && queryRecord.coverage_items.length > 0
+                        ? queryRecord.coverage_items
+                        : [{ code: "21", name: "強制責任保險", amount: queryRecord.compulsory_premium }]
+                      ).map((item, idx) => (
+                        <tr key={idx}>
+                          <td>{item.code}</td>
+                          <td>{item.name}</td>
+                          <td className="text-end">{item.amount?.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <div className="small text-end mb-3">
+                    <div>任意險保費(NT$)：<span className="fw-bold">{queryRecord.arbitrary_premium?.toLocaleString()}</span></div>
+                    <div>強制險保費(NT$)：<span className="fw-bold">{queryRecord.compulsory_premium?.toLocaleString()}</span></div>
+                    <div className="fs-5 text-danger fw-bold mt-1 pt-1 border-top">總保險費(NT$)：{queryRecord.total_premium?.toLocaleString()}</div>
+                  </div>
+
+                  {queryRecord.signature_image && (
+                    <div className="border-top pt-2">
+                      <div className="text-muted small mb-1">客戶簽名：</div>
+                      <img
+                        src={queryRecord.signature_image}
+                        alt="客戶簽名"
+                        className="border rounded w-100"
+                        style={{ maxHeight: "180px", objectFit: "contain", background: "#fff" }}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}    </div>
 
               <div className="row g-2 small mb-3">
                 <div className="col-6"><span className="text-muted">報價編號：</span><span className="font-monospace fw-bold">{queryRecord.quoteId}</span></div>
@@ -2650,8 +2749,7 @@ export default function App() {
                               type="button"
                               className="btn btn-sm btn-outline-light"
                               onClick={() => {
-                                setQueryRecord(q);
-                                setShowQueryModal(true);
+                                openQueryModal(q.quoteId);
                               }}
                             >
                               🔍
