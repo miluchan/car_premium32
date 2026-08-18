@@ -995,7 +995,7 @@ export default function App() {
     }
     try {
       const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-      const prefix = "Qota-" + todayStr + "-";
+      const prefix = "Q" + todayStr;
       const nextSerial =
         historyQuotes.filter((q) => q.quoteId.startsWith(prefix)).length + 1;
       const qid = prefix + String(nextSerial).padStart(5, "0");
