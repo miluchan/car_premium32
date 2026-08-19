@@ -266,7 +266,7 @@ export default function App() {
   const [otpCode, setOtpCode] = useState("");
   const [otpInput, setOtpInput] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
-
+  const [otpVerifiedAt, setOtpVerifiedAt] = useState(null);
   const sendOtpCode = () => {
     const code = String(Math.floor(100000 + Math.random() * 900000));
     setOtpCode(code);
@@ -282,6 +282,7 @@ export default function App() {
   const verifyOtpCode = () => {
     if (otpInput === otpCode) {
       setOtpVerified(true);
+      setOtpVerifiedAt(new Date().toISOString());
       alert("✅ OTP 身分驗證成功！現在可以送出簽名確認書。");
       setShowOtpModal(false);
       setOtpPhase("send");
@@ -1337,18 +1338,29 @@ export default function App() {
     if (activeSignRecord) {
       try {
         const signatureImage = canvas.toDataURL("image/png");
-        await supabaseClient
+        const { error: iqError } = await supabaseClient
           .from("insurance_quotations")
           .update({ status: "已簽署" })
           .eq("quotation_no", activeSignRecord.quoteId);
-          await supabaseClient
+        if (iqError) {
+          console.error("insurance_quotations update failed:", iqError);
+          alert("⚠️ 送出失敗（更新報價單狀態時發生錯誤）：\n" + iqError.message);
+          return;
+        }
+        const { error: qfrError } = await supabaseClient
           .from("quote_full_records")
           .update({
             signature_image: signatureImage,
             sign_status: "已簽署",
             otp_verified: true,
+            otp_verified_at: otpVerifiedAt || new Date().toISOString(),
           })
           .eq("quotation_no", activeSignRecord.quoteId);
+        if (qfrError) {
+          console.error("quote_full_records update failed:", qfrError);
+          alert("⚠️ 送出失敗（更新簽名/OTP資料時發生錯誤）：\n" + qfrError.message);
+          return;
+        }
         setHistoryQuotes((prev) =>
           prev.map((q) =>
             q.quoteId === activeSignRecord.quoteId
@@ -1356,21 +1368,26 @@ export default function App() {
               : q
           )
         );
-
-        // 🎯 判斷目前是「客戶手機端」還是「經辦後台自己點簽名」
+    
         const isCustomerFlow = window.location.search.includes("signId");
         if (isCustomerFlow) {
-          // 客戶端：停在「簽署完成」畫面，絕不掉回經辦後台
           setIsSigned(true);
         } else {
-          // 經辦後台自己簽：跟原本一樣，關閉彈窗、留在主畫面
           alert("✍️ 投保確認書簽署成功！該筆報價已由待簽署看板中除名！");
           setShowSignModal(false);
           setActiveSignRecord(null);
+          setShowOtpModal(false);
+          setOtpPhase("send");
+          setOtpInput("");
+          setOtpVerified(false);
+          setOtpVerifiedAt(null);
         }
-      } catch (err) {}
+      } catch (err) {
+        console.error("submitSignature unexpected error:", err);
+        alert("⚠️ 送出時發生未預期錯誤：\n" + (err?.message || String(err)));
+      }
     }
-  };
+  }
   // ====================================================================
   // 🎯 物理防禦雙視圖分流：當客戶點連結進來，直接滿版遮斷，背景絕對全白不穿透！
   // ====================================================================
@@ -2060,8 +2077,8 @@ export default function App() {
       </div>
 
       {/* 💡 修正問題 5：三大控制按鈕改為一橫列排版 */}
-      <div className="row g-2 mb-4">
-        <div className="col-3">
+      <div className="row g-2 mb-2">
+        <div className="col-4">
           <button
             type="button"
             onClick={triggerCalc}
@@ -2069,49 +2086,8 @@ export default function App() {
           >
             1. 試算保費
           </button>
-          <div className="d-flex gap-2 mt-2">
-                <button
-                  type="button"
-                  className="btn btn-outline-info fw-bold shadow-sm flex-grow-1"
-                  onClick={() => setShowFormulaModal(true)}
-                  disabled={!isCalc}
-                >
-                  🔍 驗證
-                </button>
-                <select
-                  className="form-select form-select-sm"
-                  style={{ maxWidth: "90px" }}
-                  value={verifyType}
-                  onChange={(e) => setVerifyType(e.target.value)}
-                >
-                  <option value="compulsory">強制</option>
-                  <option value="hull">車體</option>
-                  <option value="theft">竊盜</option>
-                  <option value="liability">三責</option>
-                  <option value="excess">超額</option>
-                  <option value="passenger">乘客</option>
-                </select>
-              </div>
-              <div className="d-flex gap-2 mt-2">
-                <a
-                  href="https://smrywtpsfrybqslypttj.supabase.co/storage/v1/object/public/documents/mobile_sign_consent.pdf"
-                  rel="noopener noreferrer"
-                  className="btn btn-outline-secondary fw-bold shadow-sm flex-grow-1 text-decoration-none d-flex align-items-center justify-content-center"
-                >
-                  📥 下載
-                </a>
-                <select
-                  className="form-select form-select-sm"
-                  style={{ maxWidth: "90px" }}
-                  value={downloadDocType}
-                  onChange={(e) => setDownloadDocType(e.target.value)}
-                >
-                  <option value="mobile_sign_consent">同意書</option>
-                </select>
-              </div>
         </div>
-
-        <div className="col-6">
+        <div className="col-4">
           <button
             type="button"
             onClick={handleSave}
@@ -2120,7 +2096,7 @@ export default function App() {
             2. 儲存報價單
           </button>
         </div>
-        <div className="col-3">
+        <div className="col-4">
           <button
             type="button"
             className="btn btn-dark w-100 fw-bold"
@@ -2128,6 +2104,54 @@ export default function App() {
           >
             🔍 報價查詢
           </button>
+        </div>
+      </div>
+
+      {/* 📱 驗證／下載改為獨立整行橫擺，按鈕與下拉選單放大，避免手機窄畫面點不到 */}
+      <div className="row g-2 mb-2">
+        <div className="col-7">
+          <button
+            type="button"
+            className="btn btn-outline-info fw-bold shadow-sm w-100 py-2"
+            onClick={() => setShowFormulaModal(true)}
+            disabled={!isCalc}
+          >
+            🔍 驗證
+          </button>
+        </div>
+        <div className="col-5">
+          <select
+            className="form-select w-100"
+            value={verifyType}
+            onChange={(e) => setVerifyType(e.target.value)}
+          >
+            <option value="compulsory">強制</option>
+            <option value="hull">車體</option>
+            <option value="theft">竊盜</option>
+            <option value="liability">三責</option>
+            <option value="excess">超額</option>
+            <option value="passenger">乘客</option>
+          </select>
+        </div>
+      </div>
+      <div className="row g-2 mb-4">
+        <div className="col-7">
+          <a
+            href="https://smrywtpsfrybqslypttj.supabase.co/storage/v1/object/public/documents/mobile_sign_consent.pdf"
+            rel="noopener noreferrer"
+            className="btn btn-outline-secondary fw-bold shadow-sm w-100 py-2 text-decoration-none d-flex align-items-center justify-content-center"
+          >
+            📥 下載
+          </a>
+        </div>
+        <div className="col-5">
+          <select
+            className="form-select w-100"
+            value={downloadDocType}
+            onChange={(e) => setDownloadDocType(e.target.value)}
+          >
+            <option value="mobile_sign_consent">同意書</option>
+          </select>
         </div>
       </div>
 
@@ -2159,7 +2183,7 @@ export default function App() {
                   <td>
                     <small className="font-monospace fw-bold">
                       {q.quoteId}
-                    </small>
+             </small>
                   </td>
                   <td>
                     <b>{q.clientName}</b>
@@ -2190,6 +2214,7 @@ export default function App() {
                         onClick={() => {
                           setActiveSignRecord(q);
                           setOtpVerified(false);
+                          setOtpVerifiedAt(null);
                           setClientName(q.clientName);
                           setCarNumber(q.carNumber);
                           setVehicle(q.vehicle);
@@ -2542,7 +2567,7 @@ export default function App() {
       {showOtpModal && (
         <div
           className="modal d-block show bg-black bg-opacity-75"
-          style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", zIndex: 1090, overflowY: "auto" }}
+          style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", zIndex: 100050, overflowY: "auto" }}
         >
           <div className="d-flex align-items-center justify-content-center min-vh-100 p-3">
             <div className="bg-white rounded-3 p-4 shadow-lg" style={{ maxWidth: "400px", width: "100%" }}>
@@ -2749,51 +2774,11 @@ export default function App() {
             </div>
           </div>
         </div>
-      )}    </div>
-
-              <div className="row g-2 small mb-3">
-                <div className="col-6"><span className="text-muted">報價編號：</span><span className="font-monospace fw-bold">{queryRecord.quoteId}</span></div>
-                <div className="col-6"><span className="text-muted">狀態：</span><span className="fw-bold">{queryRecord.status}</span></div>
-                <div className="col-6"><span className="text-muted">客戶姓名：</span>{queryRecord.clientName}</div>
-                <div className="col-6"><span className="text-muted">車牌號碼：</span>{queryRecord.carNumber}</div>
-                <div className="col-6"><span className="text-muted">車種：</span>{queryRecord.vehicle}</div>
-                <div className="col-6"><span className="text-muted">強制保期：</span>{queryRecord.compulsoryStartDate} ~ {queryRecord.compulsoryEndDate}</div>
-                <div className="col-6"><span className="text-muted">任意保期：</span>{queryRecord.arbitraryStartDate} ~ {queryRecord.arbitraryEndDate}</div>                <div className="col-6"><span className="text-muted">聯絡電話：</span>{queryRecord.phone || "-"}</div>
-                <div className="col-6"><span className="text-muted">E-mail：</span>{queryRecord.clientEmail || "-"}</div>
-              </div>
-
-              <table className="table table-sm table-bordered small mb-3">
-                <thead className="table-light">
-                  <tr>
-                    <th style={{ width: "50px" }}>代號</th>
-                    <th>保險種類</th>
-                    <th className="text-end" style={{ width: "110px" }}>保險費(元)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(queryRecord.coverageItems && queryRecord.coverageItems.length > 0
-                    ? queryRecord.coverageItems
-                    : [{ code: "21", name: "強制責任保險", amount: queryRecord.compulsoryPremium }]
-                  ).map((item, idx) => (
-                    <tr key={idx}>
-                      <td>{item.code}</td>
-                      <td>{item.name}</td>
-                      <td className="text-end">{item.amount?.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <div className="small text-end">
-                <div>任意險保費(NT$)：<span className="fw-bold">{queryRecord.arbitraryPremium?.toLocaleString()}</span></div>
-                <div>強制險保費(NT$)：<span className="fw-bold">{queryRecord.compulsoryPremium?.toLocaleString()}</span></div>
-                <div className="fs-5 text-danger fw-bold mt-1 pt-1 border-top">總保險費(NT$)：{queryRecord.totalPremium?.toLocaleString()}</div>
-              </div>
+      )}</div>
             </div>
           </div>
         </div>
       )}
-
       {showTableModal && (
         <div
           className="modal d-block show bg-black bg-opacity-75"
@@ -3012,9 +2997,14 @@ export default function App() {
                 onClick={() => {
                   setShowSignModal(false);
                   setActiveSignRecord(null);
+                  setShowOtpModal(false);
+                  setOtpPhase("send");
+                  setOtpInput("");
+                  setOtpVerified(false);
+                  setOtpVerifiedAt(null);
                 }}
               >
-                返回經辦主頁
+                返回經辦主頁                
               </button>
             </div>
           </div>
