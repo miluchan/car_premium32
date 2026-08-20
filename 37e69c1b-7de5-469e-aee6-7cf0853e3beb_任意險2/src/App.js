@@ -1512,8 +1512,77 @@ export default function App() {
               </div>
           <div className="text-center text-muted small border-top pt-2">
             🔒 本手寫電子簽章受商用加密協議保護。
-          </div>
+
+            </div>
         </div>
+        {showOtpModal && (
+          <div
+            className="modal d-block show bg-black bg-opacity-75"
+            style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", zIndex: 100050, overflowY: "auto" }}
+          >
+            <div className="d-flex align-items-center justify-content-center min-vh-100 p-3">
+              <div className="bg-white rounded-3 p-4 shadow-lg" style={{ maxWidth: "400px", width: "100%" }}>
+                <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                  <h6 className="fw-bold text-primary mb-0">📱 OTP 身分驗證</h6>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => {
+                      setShowOtpModal(false);
+                      setOtpPhase("send");
+                      setOtpInput("");
+                    }}
+                  />
+                </div>
+
+                {otpPhase === "send" && (
+                  <>
+                    <p className="small text-muted">
+                      將發送驗證碼至客戶手機：
+                      <span className="fw-bold text-dark">{activeSignRecord?.phone || "（查無電話號碼）"}</span>
+                    </p>
+                    <button
+                      type="button"
+                      className="btn btn-primary w-100 fw-bold"
+                      disabled={!activeSignRecord?.phone}
+                      onClick={sendOtpCode}
+                    >
+                      發送驗證碼
+                    </button>
+                  </>
+                )}
+
+                {otpPhase === "verify" && (
+                  <>
+                    <p className="small text-muted">請輸入客戶收到的 6 位數驗證碼：</p>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      className="form-control mb-3 text-center fs-4 font-monospace"
+                      value={otpInput}
+                      onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ""))}
+                      placeholder="------"
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-primary w-100 fw-bold mb-2"
+                      onClick={verifyOtpCode}
+                    >
+                      確認驗證
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-link w-100 btn-sm"
+                      onClick={sendOtpCode}
+                    >
+                      重新發送驗證碼
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
