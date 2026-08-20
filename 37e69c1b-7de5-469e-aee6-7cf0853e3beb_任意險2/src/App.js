@@ -267,6 +267,10 @@ export default function App() {
   const [otpInput, setOtpInput] = useState("");
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpVerifiedAt, setOtpVerifiedAt] = useState(null);
+  const [midVerified, setMidVerified] = useState(false);
+  const [midVerifiedAt, setMidVerifiedAt] = useState(null);
+  const [cardVerified, setCardVerified] = useState(false);
+  const [cardVerifiedAt, setCardVerifiedAt] = useState(null);
   const sendOtpCode = () => {
     const code = String(Math.floor(100000 + Math.random() * 900000));
     setOtpCode(code);
@@ -291,6 +295,19 @@ export default function App() {
       alert("❌ 驗證碼錯誤，請重新輸入");
     }
   };
+    // 📱 MID（Mobile ID）身分驗證 — 目前為模擬流程，正式串接方式待後續提供
+    const verifyMid = () => {
+      setMidVerified(true);
+      setMidVerifiedAt(new Date().toISOString());
+      alert("✅（模擬）MID 手機門號身分驗證通過！");
+    };
+  
+    // 💳 信用卡持卡人身分驗證 — 目前為模擬流程，正式串接方式待後續提供
+    const verifyCard = () => {
+      setCardVerified(true);
+      setCardVerifiedAt(new Date().toISOString());
+      alert("✅（模擬）信用卡持卡人身分驗證通過！");
+    };
   const [queryLoading, setQueryLoading] = useState(false);
   const openQueryModal = async (qid) => {
     setShowQueryModal(true);
@@ -1381,12 +1398,16 @@ export default function App() {
           setOtpInput("");
           setOtpVerified(false);
           setOtpVerifiedAt(null);
+          setMidVerified(false);
+          setMidVerifiedAt(null);
+          setCardVerified(false);
+          setCardVerifiedAt(null);
         }
       } catch (err) {
         console.error("submitSignature unexpected error:", err);
         alert("⚠️ 送出時發生未預期錯誤：\n" + (err?.message || String(err)));
       }
-    }
+    }          
   }
   // ====================================================================
   // 🎯 物理防禦雙視圖分流：當客戶點連結進來，直接滿版遮斷，背景絕對全白不穿透！
@@ -1447,6 +1468,70 @@ export default function App() {
             </div>
           </div>
           <div className="text-start text-danger fw-bold small mb-2">
+            ⚠️ 行動投保簽名要保人必須完成以下兩種身分驗證始能生效
+          </div>
+          <div className="d-flex flex-column gap-2 mb-3">
+            <div
+              className={`d-flex justify-content-between align-items-center rounded-2 p-2 ${
+                midVerified ? "bg-success bg-opacity-10" : "bg-warning bg-opacity-10"
+              }`}
+            >
+              <span className="small fw-bold">
+                {midVerified ? "✅ MID驗證已通過" : "⚠️ 尚未完成 MID驗證"}
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-primary"
+                onClick={verifyMid}
+                disabled={midVerified}
+              >
+                {midVerified ? "已驗證" : "MID驗證"}
+              </button>
+            </div>
+            <div
+              className={`d-flex justify-content-between align-items-center rounded-2 p-2 ${
+                cardVerified ? "bg-success bg-opacity-10" : "bg-warning bg-opacity-10"
+              }`}
+            >
+              <span className="small fw-bold">
+                {cardVerified ? "✅ 信用卡持卡人驗證已通過" : "⚠️ 尚未完成 信用卡持卡人驗證"}
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-primary"
+                onClick={verifyCard}
+                disabled={cardVerified}
+              >
+                {cardVerified ? "已驗證" : "信用卡持卡人驗證"}
+              </button>
+            </div>
+            <div
+              className={`d-flex justify-content-between align-items-center rounded-2 p-2 ${
+                otpVerified ? "bg-success bg-opacity-10" : "bg-warning bg-opacity-10"
+              }`}
+            >
+              <span className="small fw-bold">
+                {otpVerified ? "✅ OTP驗證已通過" : "⚠️ 尚未完成 OTP驗證"}
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-primary"
+                onClick={() => {
+                  if (!activeSignRecord?.phone) {
+                    alert(
+                      "⚠️ 無法進行 OTP 驗證：這筆報價單沒有留存客戶行動電話。\n請經辦人員回到報價系統，補上行動電話後重新試算並儲存，才能進行 OTP 驗證。"
+                    );
+                    return;
+                  }
+                  setShowOtpModal(true);
+                }}
+                disabled={otpVerified}
+              >
+                {otpVerified ? "已驗證" : "OTP驗證"}
+              </button>
+            </div>
+          </div>
+          <div className="text-start text-danger fw-bold small mb-2">
             請在藍色虛線框內用手指或滑鼠手寫簽名：
           </div>
           <canvas
@@ -1468,31 +1553,6 @@ export default function App() {
             onTouchMove={draw}
             onTouchEnd={stopDrawing}
           />
-              <div
-                className={`d-flex justify-content-between align-items-center rounded-2 p-2 mb-3 ${
-                  otpVerified ? "bg-success bg-opacity-10" : "bg-warning bg-opacity-10"
-                }`}
-              >
-                <span className="small fw-bold">
-                  {otpVerified ? "✅ OTP 身分驗證已通過" : "⚠️ 尚未完成 OTP 身分驗證"}
-                </span>
-                <button
-              type="button"
-              className="btn btn-sm btn-outline-primary"
-              onClick={() => {
-                if (!activeSignRecord?.phone) {
-                  alert(
-                    "⚠️ 無法進行 OTP 驗證：這筆報價單沒有留存客戶行動電話。\n請經辦人員回到報價系統，補上行動電話後重新試算並儲存，才能進行 OTP 驗證。"
-                  );
-                  return;
-                }
-                setShowOtpModal(true);
-              }}
-              disabled={otpVerified}
-            >
-              {otpVerified ? "已驗證" : "OTP驗證"}
-            </button>
-              </div>
               <div className="d-flex gap-2 mb-3">
                 <button
                   type="button"
@@ -1505,15 +1565,14 @@ export default function App() {
                   type="button"
                   className="btn btn-primary w-50 fw-bold py-2"
                   onClick={submitSignature}
-                  disabled={!otpVerified}
+                  disabled={!(otpVerified && midVerified && cardVerified)}
                 >
                   確認送出確認書
                 </button>
               </div>
           <div className="text-center text-muted small border-top pt-2">
             🔒 本手寫電子簽章受商用加密協議保護。
-
-            </div>
+          </div>
         </div>
         {showOtpModal && (
           <div
@@ -2284,6 +2343,10 @@ export default function App() {
                           setActiveSignRecord(q);
                           setOtpVerified(false);
                           setOtpVerifiedAt(null);
+                          setMidVerified(false);
+                          setMidVerifiedAt(null);
+                          setCardVerified(false);
+                          setCardVerifiedAt(null);
                           setClientName(q.clientName);
                           setCarNumber(q.carNumber);
                           setVehicle(q.vehicle);
@@ -2997,6 +3060,70 @@ export default function App() {
                 </div>
               </div>
               <div className="text-start text-danger fw-bold small mb-2">
+                ⚠️ 行動投保簽名要保人必須完成以下兩種身分驗證始能生效
+              </div>
+              <div className="d-flex flex-column gap-2 mb-3">
+                <div
+                  className={`d-flex justify-content-between align-items-center rounded-2 p-2 ${
+                    midVerified ? "bg-success bg-opacity-10" : "bg-warning bg-opacity-10"
+                  }`}
+                >
+                  <span className="small fw-bold">
+                    {midVerified ? "✅ MID驗證已通過" : "⚠️ 尚未完成 MID驗證"}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary"
+                    onClick={verifyMid}
+                    disabled={midVerified}
+                  >
+                    {midVerified ? "已驗證" : "MID驗證"}
+                  </button>
+                </div>
+                <div
+                  className={`d-flex justify-content-between align-items-center rounded-2 p-2 ${
+                    cardVerified ? "bg-success bg-opacity-10" : "bg-warning bg-opacity-10"
+                  }`}
+                >
+                  <span className="small fw-bold">
+                    {cardVerified ? "✅ 信用卡持卡人驗證已通過" : "⚠️ 尚未完成 信用卡持卡人驗證"}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary"
+                    onClick={verifyCard}
+                    disabled={cardVerified}
+                  >
+                    {cardVerified ? "已驗證" : "信用卡持卡人驗證"}
+                  </button>
+                </div>
+                <div
+                  className={`d-flex justify-content-between align-items-center rounded-2 p-2 ${
+                    otpVerified ? "bg-success bg-opacity-10" : "bg-warning bg-opacity-10"
+                  }`}
+                >
+                  <span className="small fw-bold">
+                    {otpVerified ? "✅ OTP驗證已通過" : "⚠️ 尚未完成 OTP驗證"}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary"
+                    onClick={() => {
+                      if (!activeSignRecord?.phone) {
+                        alert(
+                          "⚠️ 無法進行 OTP 驗證：這筆報價單沒有留存客戶行動電話。\n請經辦人員回到報價系統，補上行動電話後重新試算並儲存，才能進行 OTP 驗證。"
+                        );
+                        return;
+                      }
+                      setShowOtpModal(true);
+                    }}
+                    disabled={otpVerified}
+                  >
+                    {otpVerified ? "已驗證" : "OTP驗證"}
+                  </button>
+                </div>
+              </div>
+              <div className="text-start text-danger fw-bold small mb-2">
                 請在藍色虛線框內用手指或滑鼠手寫簽名：
               </div>
               <canvas
@@ -3018,31 +3145,6 @@ export default function App() {
                 onTouchMove={draw}
                 onTouchEnd={stopDrawing}
               />
-          <div
-            className={`d-flex justify-content-between align-items-center rounded-2 p-2 mb-3 ${
-              otpVerified ? "bg-success bg-opacity-10" : "bg-warning bg-opacity-10"
-            }`}
-          >
-            <span className="small fw-bold">
-              {otpVerified ? "✅ OTP 身分驗證已通過" : "⚠️ 尚未完成 OTP 身分驗證"}
-            </span>
-            <button
-              type="button"
-              className="btn btn-sm btn-outline-primary"
-              onClick={() => {
-                if (!activeSignRecord?.phone) {
-                  alert(
-                    "⚠️ 無法進行 OTP 驗證：這筆報價單沒有留存客戶行動電話。\n請經辦人員回到報價系統，補上行動電話後重新試算並儲存，才能進行 OTP 驗證。"
-                  );
-                  return;
-                }
-                setShowOtpModal(true);
-              }}
-              disabled={otpVerified}
-            >
-              {otpVerified ? "已驗證" : "OTP驗證"}
-            </button>
-          </div>
           <div className="d-flex gap-2 mb-3">
             <button
               type="button"
@@ -3055,7 +3157,7 @@ export default function App() {
               type="button"
               className="btn btn-primary w-50 fw-bold"
               onClick={submitSignature}
-              disabled={!otpVerified}
+              disabled={!(otpVerified && midVerified && cardVerified)}
             >
               確認送出確認書
             </button>
@@ -3071,9 +3173,13 @@ export default function App() {
                   setOtpInput("");
                   setOtpVerified(false);
                   setOtpVerifiedAt(null);
+                  setMidVerified(false);
+                  setMidVerifiedAt(null);
+                  setCardVerified(false);
+                  setCardVerifiedAt(null);
                 }}
               >
-                返回經辦主頁                
+                返回經辦主頁
               </button>
             </div>
           </div>
@@ -3082,4 +3188,3 @@ export default function App() {
     </div>
   );
 } // ⚠️ 鋼鐵終極封頂結尾大括號！
-
