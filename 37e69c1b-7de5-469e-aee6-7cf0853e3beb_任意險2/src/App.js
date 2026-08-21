@@ -303,11 +303,25 @@ export default function App() {
     };
   
     // 💳 信用卡持卡人身分驗證 — 目前為模擬流程，正式串接方式待後續提供
+    const [cardNumberInput, setCardNumberInput] = useState("");
+    const handleCardNumberChange = (e) => {
+      const digits = e.target.value.replace(/\D/g, "").slice(0, 16);
+      const formatted = digits.replace(/(.{4})/g, "$1 ").trim();
+      setCardNumberInput(formatted);
+    };
     const verifyCard = () => {
+      const digits = cardNumberInput.replace(/\s/g, "");
+      if (digits.length !== 16) {
+        alert("⚠️ 請輸入完整 16 碼信用卡卡號後再進行驗證。");
+        return;
+      }
       setCardVerified(true);
       setCardVerifiedAt(new Date().toISOString());
       alert("✅（模擬）信用卡持卡人身分驗證通過！");
     };
+   
+    // ℹ️ 身分驗證「說明及注意事項」彈窗開關
+    const [showVerifyInfoModal, setShowVerifyInfoModal] = useState(false);
   const [queryLoading, setQueryLoading] = useState(false);
   const openQueryModal = async (qid) => {
     setShowQueryModal(true);
@@ -1140,6 +1154,8 @@ export default function App() {
             sign_status: "待簽署",
             payment_status: "未繳費",
             otp_verified: false,
+            mid_verified: false,
+            card_verified: false,
           },
         ]);
 
@@ -1369,8 +1385,12 @@ export default function App() {
           .update({
             signature_image: signatureImage,
             sign_status: "已簽署",
-            otp_verified: true,
-            otp_verified_at: otpVerifiedAt || new Date().toISOString(),
+            otp_verified: otpVerified,
+            otp_verified_at: otpVerified ? (otpVerifiedAt || new Date().toISOString()) : null,
+            mid_verified: midVerified,
+            mid_verified_at: midVerified ? (midVerifiedAt || new Date().toISOString()) : null,
+            card_verified: cardVerified,
+            card_verified_at: cardVerified ? (cardVerifiedAt || new Date().toISOString()) : null,
           })
           .eq("quotation_no", activeSignRecord.quoteId);
         if (qfrError) {
@@ -1402,6 +1422,7 @@ export default function App() {
           setMidVerifiedAt(null);
           setCardVerified(false);
           setCardVerifiedAt(null);
+          setCardNumberInput("");
         }
       } catch (err) {
         console.error("submitSignature unexpected error:", err);
@@ -1470,6 +1491,14 @@ export default function App() {
           <div className="text-start text-danger fw-bold small mb-2">
             ⚠️ 行動投保簽名要保人必須完成以下兩種身分驗證始能生效
           </div>
+          <button
+              type="button"
+              className="btn btn-sm btn-outline-secondary flex-shrink-0 ms-2"
+              onClick={() => setShowVerifyInfoModal(true)}
+            >
+              說明及注意事項
+            </button>
+          </div>
           <div className="d-flex flex-column gap-2 mb-3">
             <div
               className={`d-flex justify-content-between align-items-center rounded-2 p-2 ${
@@ -1477,7 +1506,7 @@ export default function App() {
               }`}
             >
               <span className="small fw-bold">
-                {midVerified ? "✅ MID驗證已通過" : "⚠️ 尚未完成 MID驗證"}
+                {midVerified ? "✅ MID驗證已通過" : "未驗證"}
               </span>
               <button
                 type="button"
@@ -1489,21 +1518,34 @@ export default function App() {
               </button>
             </div>
             <div
-              className={`d-flex justify-content-between align-items-center rounded-2 p-2 ${
+              className={`rounded-2 p-2 ${
                 cardVerified ? "bg-success bg-opacity-10" : "bg-warning bg-opacity-10"
               }`}
             >
-              <span className="small fw-bold">
-                {cardVerified ? "✅ 信用卡持卡人驗證已通過" : "⚠️ 尚未完成 信用卡持卡人驗證"}
-              </span>
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-primary"
-                onClick={verifyCard}
-                disabled={cardVerified}
-              >
-                {cardVerified ? "已驗證" : "信用卡持卡人驗證"}
-              </button>
+              <div className="d-flex justify-content-between align-items-center">
+                <span className="small fw-bold">
+                  {cardVerified ? "✅ 信用卡持卡人驗證已通過" : "未驗證"}
+                </span>
+              </div>
+              {!cardVerified && (
+                <div className="d-flex gap-2 mt-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    className="form-control form-control-sm font-monospace"
+                    placeholder="---- ---- ---- ----"
+                    value={cardNumberInput}
+                    onChange={handleCardNumberChange}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary flex-shrink-0"
+                    onClick={verifyCard}
+                  >
+                    信用卡持卡人驗證
+                  </button>
+                </div>
+              )}
             </div>
             <div
               className={`d-flex justify-content-between align-items-center rounded-2 p-2 ${
@@ -1511,7 +1553,7 @@ export default function App() {
               }`}
             >
               <span className="small fw-bold">
-                {otpVerified ? "✅ OTP驗證已通過" : "⚠️ 尚未完成 OTP驗證"}
+                {otpVerified ? "✅ OTP驗證已通過" : "未驗證"}
               </span>
               <button
                 type="button"
@@ -1530,7 +1572,7 @@ export default function App() {
                 {otpVerified ? "已驗證" : "OTP驗證"}
               </button>
             </div>
-          </div>
+          
           <div className="text-start text-danger fw-bold small mb-2">
             請在藍色虛線框內用手指或滑鼠手寫簽名：
           </div>
@@ -2347,6 +2389,7 @@ export default function App() {
                           setMidVerifiedAt(null);
                           setCardVerified(false);
                           setCardVerifiedAt(null);
+                          setCardNumberInput("");
                           setClientName(q.clientName);
                           setCarNumber(q.carNumber);
                           setVehicle(q.vehicle);
@@ -2859,7 +2902,7 @@ export default function App() {
                     <div className="col-6"><span className="text-muted">聯絡電話：</span>{queryRecord.phone || "-"}</div>
                     <div className="col-6"><span className="text-muted">E-mail：</span>{queryRecord.client_email || "-"}</div>
                     <div className="col-6"><span className="text-muted">繳費狀態：</span>{queryRecord.payment_status}</div>
-                    <div className="col-6"><span className="text-muted">OTP驗證：</span>{queryRecord.otp_verified ? "✅ 已驗證" : "未驗證"}</div>
+                    <div className="col-6"><span className="text-muted">身分驗證：</span>{queryRecord.otp_verified ? "✅ 已驗證" : "未驗證"}</div>
                   </div>
 
                   <table className="table table-sm table-bordered small mb-3">
@@ -2984,7 +3027,15 @@ export default function App() {
                           ${q.totalPremium?.toLocaleString()}
                         </td>
                         <td>
-                          <span className="badge bg-warning text-dark">
+                          <span
+                            className={`badge ${
+                              q.status === "待簽署"
+                                ? "bg-danger text-white"
+                                : q.status === "已簽署"
+                                ? "bg-success text-white"
+                                : "bg-warning text-dark"
+                            }`}
+                          >
                             {q.status}
                           </span>
                         </td>
@@ -3062,6 +3113,14 @@ export default function App() {
               <div className="text-start text-danger fw-bold small mb-2">
                 ⚠️ 行動投保簽名要保人必須完成以下兩種身分驗證始能生效
               </div>
+              <button
+                  type="button"
+                  className="btn btn-sm btn-outline-secondary flex-shrink-0 ms-2"
+                  onClick={() => setShowVerifyInfoModal(true)}
+                >
+                  說明及注意事項
+                </button>
+              </div>
               <div className="d-flex flex-column gap-2 mb-3">
                 <div
                   className={`d-flex justify-content-between align-items-center rounded-2 p-2 ${
@@ -3069,7 +3128,7 @@ export default function App() {
                   }`}
                 >
                   <span className="small fw-bold">
-                    {midVerified ? "✅ MID驗證已通過" : "⚠️ 尚未完成 MID驗證"}
+                    {midVerified ? "✅ MID驗證已通過" : "未驗證"}
                   </span>
                   <button
                     type="button"
@@ -3081,21 +3140,34 @@ export default function App() {
                   </button>
                 </div>
                 <div
-                  className={`d-flex justify-content-between align-items-center rounded-2 p-2 ${
+                  className={`rounded-2 p-2 ${
                     cardVerified ? "bg-success bg-opacity-10" : "bg-warning bg-opacity-10"
                   }`}
                 >
-                  <span className="small fw-bold">
-                    {cardVerified ? "✅ 信用卡持卡人驗證已通過" : "⚠️ 尚未完成 信用卡持卡人驗證"}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-primary"
-                    onClick={verifyCard}
-                    disabled={cardVerified}
-                  >
-                    {cardVerified ? "已驗證" : "信用卡持卡人驗證"}
-                  </button>
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="small fw-bold">
+                      {cardVerified ? "✅ 信用卡持卡人驗證已通過" : "未驗證"}
+                    </span>
+                  </div>
+                  {!cardVerified && (
+                    <div className="d-flex gap-2 mt-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="form-control form-control-sm font-monospace"
+                        placeholder="---- ---- ---- ----"
+                        value={cardNumberInput}
+                        onChange={handleCardNumberChange}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-primary flex-shrink-0"
+                        onClick={verifyCard}
+                      >
+                        信用卡持卡人驗證
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div
                   className={`d-flex justify-content-between align-items-center rounded-2 p-2 ${
@@ -3103,7 +3175,7 @@ export default function App() {
                   }`}
                 >
                   <span className="small fw-bold">
-                    {otpVerified ? "✅ OTP驗證已通過" : "⚠️ 尚未完成 OTP驗證"}
+                    {otpVerified ? "✅ OTP驗證已通過" : "未驗證"}
                   </span>
                   <button
                     type="button"
@@ -3122,7 +3194,7 @@ export default function App() {
                     {otpVerified ? "已驗證" : "OTP驗證"}
                   </button>
                 </div>
-              </div>
+              
               <div className="text-start text-danger fw-bold small mb-2">
                 請在藍色虛線框內用手指或滑鼠手寫簽名：
               </div>
@@ -3177,6 +3249,7 @@ export default function App() {
                   setMidVerifiedAt(null);
                   setCardVerified(false);
                   setCardVerifiedAt(null);
+                  setCardNumberInput("");
                 }}
               >
                 返回經辦主頁
