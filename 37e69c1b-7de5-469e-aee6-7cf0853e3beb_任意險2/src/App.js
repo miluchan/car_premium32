@@ -1488,10 +1488,11 @@ export default function App() {
               {totalPremium ? totalPremium.toLocaleString() : "17,275"} 元
             </div>
           </div>
-          <div className="text-start text-danger fw-bold small mb-2">
-            ⚠️ 行動投保簽名要保人必須完成以下兩種身分驗證始能生效
-          </div>
-          <button
+          <div className="d-flex justify-content-between align-items-center mb-2">
+            <div className="text-start text-danger fw-bold small">
+              ⚠️ 行動投保簽名前要保人必須完成以下任意兩種的身分驗證始能生效
+            </div>
+            <button
               type="button"
               className="btn btn-sm btn-outline-secondary flex-shrink-0 ms-2"
               onClick={() => setShowVerifyInfoModal(true)}
@@ -1572,7 +1573,7 @@ export default function App() {
                 {otpVerified ? "已驗證" : "OTP驗證"}
               </button>
             </div>
-          
+          </div>
           <div className="text-start text-danger fw-bold small mb-2">
             請在藍色虛線框內用手指或滑鼠手寫簽名：
           </div>
@@ -1616,6 +1617,7 @@ export default function App() {
             🔒 本手寫電子簽章受商用加密協議保護。
           </div>
         </div>
+        
         {showOtpModal && (
           <div
             className="modal d-block show bg-black bg-opacity-75"
@@ -3090,7 +3092,7 @@ export default function App() {
             style={{ maxWidth: "550px" }}
           >
             <div className="modal-content p-4 border shadow-lg bg-white rounded-3">
-              <div
+            <div
                 className="text-center fw-bold border-bottom pb-2 mb-3 text-primary"
                 style={{ fontSize: "1.2rem" }}
               >
@@ -3110,10 +3112,11 @@ export default function App() {
                   {totalPremium ? totalPremium.toLocaleString() : "17,275"} 元
                 </div>
               </div>
-              <div className="text-start text-danger fw-bold small mb-2">
-                ⚠️ 行動投保簽名要保人必須完成以下兩種身分驗證始能生效
-              </div>
-              <button
+              <div className="d-flex justify-content-between align-items-center mb-2">
+                <div className="text-start text-danger fw-bold small">
+                  ⚠️ 行動投保簽名前要保人必須完成以下任意兩種的身分驗證始能生效
+                </div>
+                <button
                   type="button"
                   className="btn btn-sm btn-outline-secondary flex-shrink-0 ms-2"
                   onClick={() => setShowVerifyInfoModal(true)}
@@ -3194,7 +3197,7 @@ export default function App() {
                     {otpVerified ? "已驗證" : "OTP驗證"}
                   </button>
                 </div>
-              
+              </div>
               <div className="text-start text-danger fw-bold small mb-2">
                 請在藍色虛線框內用手指或滑鼠手寫簽名：
               </div>
