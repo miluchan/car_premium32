@@ -1608,15 +1608,15 @@ export default function App() {
                   type="button"
                   className="btn btn-primary w-50 fw-bold py-2"
                   onClick={submitSignature}
-                  disabled={!(otpVerified && midVerified && cardVerified)}
+                  disabled={[otpVerified, midVerified, cardVerified].filter(Boolean).length < 2}
                 >
                   確認送出確認書
                 </button>
               </div>
           <div className="text-center text-muted small border-top pt-2">
-            🔒 本手寫電子簽章受商用加密協議保護。
-          </div>
+          🔒 本手寫電子簽章受商用加密協議保護。
         </div>
+      </div>
         
         {showOtpModal && (
           <div
@@ -2809,6 +2809,43 @@ export default function App() {
           </div>
         </div>
       )}
+      {showVerifyInfoModal && (
+        <div
+          className="modal d-block show bg-black bg-opacity-75"
+          style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", zIndex: 100060, overflowY: "auto" }}
+        >
+          <div className="d-flex align-items-center justify-content-center min-vh-100 p-3">
+            <div className="bg-white rounded-3 p-4 shadow-lg" style={{ maxWidth: "480px", width: "100%" }}>
+              <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                <h6 className="fw-bold text-primary mb-0">ℹ️ 說明及注意事項</h6>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowVerifyInfoModal(false)}
+                />
+              </div>
+              <div className="small text-start" style={{ lineHeight: 1.8 }}>
+                <p>
+                  1. 進行手機驗證(MID驗證)前，請先關閉 WiFi，並使用 4G/5G 之行動數據進行連線，若為雙卡機用戶請確認欲驗證之手機門號是否正在使用。
+                </p>
+                <p>
+                  2. 依法令規定為保障客戶權益，簽署要保書時，會透過「信用卡持卡人驗證」程序，輔助手機驗證(Mobile ID)，強化簽署者識別，本步驟之信用卡卡號輸入僅作為驗證用途，驗證通過後不會主動執行扣款。另外，驗證過程請使用要保人及被保險人本人申辦之信用卡驗證，若輸入非本人申辦之信用卡卡號將會驗證失敗。
+                </p>
+                <p className="mb-0">
+                  3. 完成上述之投保服務後，本公司將進行抽樣電訪程序確認是否為要保人本人完成文件簽署，為確保客戶權益，非本人完成驗證，本公司將不予承保。
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary w-100 fw-bold mt-3"
+                onClick={() => setShowVerifyInfoModal(false)}
+              >
+                我已知悉
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 {showDownloadModal && (
         <div
           className="modal d-block show bg-black bg-opacity-75 print-modal-wrapper"
@@ -3230,9 +3267,9 @@ export default function App() {
             </button>
             <button
               type="button"
-              className="btn btn-primary w-50 fw-bold"
+              className="btn btn-primary w-50 fw-bold py-2"
               onClick={submitSignature}
-              disabled={!(otpVerified && midVerified && cardVerified)}
+              disabled={[otpVerified, midVerified, cardVerified].filter(Boolean).length < 2}
             >
               確認送出確認書
             </button>
