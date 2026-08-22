@@ -321,7 +321,326 @@ export default function App() {
     };
    
     // ℹ️ 身分驗證「說明及注意事項」彈窗開關
-    const [showVerifyInfoModal, setShowVerifyInfoModal] = useState(false);
+  // ℹ️ 身分驗證「說明及注意事項」彈窗開關
+  const [showVerifyInfoModal, setShowVerifyInfoModal] = useState(false);
+ 
+  // ================================================================
+  // 🤖 AI快速報價（規則式問答版，先跑流程，之後可再串接真AI大腦）
+  // ================================================================
+  const [showAiQuoteModal, setShowAiQuoteModal] = useState(false);
+  const [aiChatMessages, setAiChatMessages] = useState([]);
+  const [aiChatInput, setAiChatInput] = useState("");
+  const [aiChatStep, setAiChatStep] = useState(0);
+  const [aiChatAnswers, setAiChatAnswers] = useState({});
+  const [aiListening, setAiListening] = useState(false);
+  const [aiRecommendation, setAiRecommendation] = useState(null);
+  const aiRecognitionRef = useRef(null);
+ 
+  const aiQuestions = [
+    {
+      key: "carInfo",
+      text: "您好，我是快速報價小幫手 🤖 請問您的愛車是什麼廠牌車型呢？(例如：Toyota Altis)",
+    },
+    {
+      key: "carYear",
+      text: "了解，這台車大約是幾年的車呢？(出廠年份，例如 2020，或說「新車」)",
+    },
+    {
+      key: "ageGender",
+      text: "方便請教一下要保人的年齡和性別嗎？(例如：35歲 男)",
+    },
+    {
+      key: "claimHistory",
+      text: "過去有沒有出過險，或是有酒駕紀錄呢？(沒有的話直接說「沒有」即可)",
+    },
+    {
+      key: "coverageWanted",
+      text: "想投保哪些險種呢？(例如：車體險、竊盜險、第三人責任險、乘客險，或是「都要」「基本的就好」)",
+    },
+    {
+      key: "budget",
+      text: "最後，大概的預算是多少呢？(例如：2萬以內、不限預算)",
+    },
+  ];
+ 
+  const openAiQuoteModal = () => {
+    setAiChatMessages([{ role: "ai", text: aiQuestions[0].text }]);
+    setAiChatStep(0);
+    setAiChatAnswers({});
+    setAiChatInput("");
+    setAiRecommendation(null);
+    setShowAiQuoteModal(true);
+  };
+ 
+  const generateAiRecommendation = (answers) => {
+    const wantText = answers.coverageWanted || "";
+    const budgetText = answers.budget || "";
+    const historyText = answers.claimHistory || "";
+ 
+    const wantAll = /都要|全部|全險/.test(wantText);
+    const wantBasic = /基本|陽春|強制險就好|只要強制/.test(wantText);
+ 
+    const budgetNumMatch = budgetText.match(/(\d+(\.\d+)?)/);
+    let budgetLevel = "mid";
+    if (budgetNumMatch) {
+      let num = parseFloat(budgetNumMatch[1]);
+      if (/萬/.test(budgetText)) num = num * 10000;
+      if (num > 0 && num <= 15000) budgetLevel = "low";
+      else if (num >= 30000) budgetLevel = "high";
+    }
+    if (/不限|沒關係|都可以/.test(budgetText)) budgetLevel = "high";
+ 
+    const hasRisk =
+      /(有.*(出險|酒駕)|酒駕)/.test(historyText) && !/沒有|無/.test(historyText);
+ 
+    const rec = {
+      liability: true,
+      hull:
+        wantAll ||
+        /車體|碰撞|自碰/.test(wantText) ||
+        (!wantBasic && budgetLevel !== "low"),
+      theft:
+        wantAll || /竊盜|失竊/.test(wantText) || (!wantBasic && budgetLevel === "high"),
+      excess: wantAll || /超額|加保/.test(wantText),
+      passenger: wantAll || /乘客/.test(wantText),
+    };
+    if (wantBasic) {
+      rec.hull = false;
+      rec.theft = false;
+      rec.excess = false;
+      rec.passenger = false;
+    }
+ 
+    let note = "";
+    if (hasRisk) {
+      note =
+        "由於您提到過去有出險或酒駕紀錄，實際保費可能會因從人係數而提高，正式試算時請提供詳細紀錄，以利業務員為您確認費率。";
+    }
+ 
+    return { ...rec, note, budgetLevel };
+  };
+ 
+  const handleAiChatSend = () => {
+    const text = aiChatInput.trim();
+    if (!text) return;
+    const currentQuestion = aiQuestions[aiChatStep];
+    const newAnswers = { ...aiChatAnswers, [currentQuestion.key]: text };
+    const newMessages = [...aiChatMessages, { role: "user", text }];
+ 
+    const nextStep = aiChatStep + 1;
+    if (nextStep < aiQuestions.length) {
+      newMessages.push({ role: "ai", text: aiQuestions[nextStep].text });
+      setAiChatMessages(newMessages);
+      setAiChatAnswers(newAnswers);
+      setAiChatStep(nextStep);
+    } else {
+      const rec = generateAiRecommendation(newAnswers);
+      newMessages.push({
+        role: "ai",
+        text:
+          "謝謝您的說明！根據您提供的資訊，我為您整理出以下建議投保組合，您可以在下方勾選調整，確認後按「帶入主頁繼續試算」即可帶入正式報價表單喔～",
+      });
+      setAiChatMessages(newMessages);
+      setAiChatAnswers(newAnswers);
+      setAiRecommendation(rec);
+    }
+    setAiChatInput("");
+  };
+ 
+  const toggleAiRecommendationItem = (field) => {
+    setAiRecommendation((prev) => (prev ? { ...prev, [field]: !prev[field] } : prev));
+  };
+ 
+  // 「廠牌車系」是綁定資料庫選單的下拉選單，不能塞任意文字進去，
+  // 所以用 AI 聊天時打的廠牌車型文字，去brandOptions裡面做寬鬆比對，
+  // 找到才用 handleVChg 正確帶入（連同代號/排氣量/重置價格一起連動）。
+  const findBrandMatch = (text) => {
+    if (!text || !brandOptions || brandOptions.length === 0) return null;
+    const norm = text.toUpperCase().replace(/\s+/g, "");
+    let match = brandOptions.find((o) =>
+      o.label.toUpperCase().replace(/\s+/g, "").includes(norm)
+    );
+    if (match) return match;
+    const tokens = text.toUpperCase().split(/\s+/).filter(Boolean);
+    if (tokens.length > 0) {
+      match = brandOptions.find((o) => {
+        const labelNorm = o.label.toUpperCase();
+        return tokens.every((t) => labelNorm.includes(t));
+      });
+    }
+    return match || null;
+  };
+ 
+  // 🔢 從 claimHistory 文字中解析「出險」「酒駕」的次數（找不到明確次數就不亂猜）
+  const cnNumMap = { 一: 1, 兩: 2, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
+  const parseIncidentCount = (text, keyword) => {
+    if (!text) return { count: 0, mentioned: false };
+    const negPattern = new RegExp(`(沒有|没有|無)[^，,。]{0,2}${keyword}`);
+    if (negPattern.test(text)) return { count: 0, mentioned: false };
+    if (!text.includes(keyword)) return { count: 0, mentioned: false };
+    const digitMatch = text.match(new RegExp(`${keyword}[^\\d]{0,3}(\\d+)`));
+    if (digitMatch) return { count: Math.min(10, parseInt(digitMatch[1], 10)), mentioned: true };
+    const cnPattern = new RegExp(
+      `${keyword}[^一二兩三四五六七八九十]{0,3}([一二兩三四五六七八九十])次`
+    );
+    const cnMatch = text.match(cnPattern);
+    if (cnMatch) return { count: cnNumMap[cnMatch[1]] || 1, mentioned: true };
+    return { count: 0, mentioned: true }; // 有提到但抓不到明確次數
+  };
+ 
+  const applyAiRecommendationToForm = () => {
+    if (!aiRecommendation) return;
+    setHasLiability(true);
+    setHasHull(!!aiRecommendation.hull);
+    setHasTheft(!!aiRecommendation.theft);
+    setHasExcess(!!aiRecommendation.excess);
+    setHasPassenger(!!aiRecommendation.passenger);
+ 
+    const today = new Date();
+    const todayMM = String(today.getMonth() + 1).padStart(2, "0");
+    const todayDD = String(today.getDate()).padStart(2, "0");
+ 
+    const genderText = aiChatAnswers.ageGender || "";
+    if (/男/.test(genderText)) setGender("男");
+    else if (/女/.test(genderText)) setGender("女");
+ 
+    // 🎂 生日：用年齡推算出生年(換算民國年)，月/日用今天的月日
+    let birthdaySet = false;
+    const ageMatch = genderText.match(/\d+/);
+    if (ageMatch) {
+      const age = parseInt(ageMatch[0], 10);
+      if (age > 0 && age < 120) {
+        const birthYearWestern = today.getFullYear() - age;
+        const rocYear = birthYearWestern - 1911;
+        if (rocYear > 0) {
+          setBirthday(`${rocYear}${todayMM}${todayDD}`);
+          birthdaySet = true;
+        }
+      }
+    }
+ 
+    // 🚗 製造年月：解析 carYear 回答（支援「2020」「109年」「5年」「新車」等講法）
+    const carYearText = aiChatAnswers.carYear || "";
+    let manufYear = null;
+    if (/新車|今年/.test(carYearText)) {
+      manufYear = today.getFullYear();
+    } else {
+      const numMatch = carYearText.match(/\d+/);
+      if (numMatch) {
+        const num = parseInt(numMatch[0], 10);
+        if (num > 1911) {
+          manufYear = num; // 西元年，例如 2020
+        } else if (num >= 50 && num <= 130) {
+          manufYear = num + 1911; // 民國年，例如 109
+        } else if (num > 0 && num < 50) {
+          manufYear = today.getFullYear() - num; // 車齡，例如「5年」
+        }
+      }
+    }
+    let manufactureSet = false;
+    if (manufYear) {
+      setManufactureDate(`${manufYear}${todayMM}`);
+      manufactureSet = true;
+    }
+ 
+    // 🚦 出險/酒駕紀錄：
+    // 只簡單問「出險次數」，沒細分是強制/車責/車體哪一種出的，所以改成依「實際有投保的項目」對應套用：
+    //   - 強制肇事等級：法定一定有保，永遠套用
+    //   - 車責賠款等級：只有這次有勾選第三人責任險才套用
+    //   - 車體賠款等級：只有這次有勾選車體險才套用
+    // 有出險 → 每次出險 +1 級（各自上限10/10/6）
+    // 沒出險 → 新車(車齡0)=預設值，車齡每多一年 -1 級（無賠款折扣逐年累積，各自下限1/1/-3）
+    // 這只是簡化版對應，之後查完費率公式的實際理賠次數/級數換算表後，這段邏輯要再換成精算版本。
+    const historyText = aiChatAnswers.claimHistory || "";
+    const claimInfo = parseIncidentCount(historyText, "出險");
+    const duiInfo = parseIncidentCount(historyText, "酒駕");
+    const carAge = manufYear ? Math.max(0, today.getFullYear() - manufYear) : null;
+
+    let levelSet = false;
+    if (claimInfo.count > 0) {
+      setLevel(String(Math.min(10, 4 + claimInfo.count)));
+      if (aiRecommendation.liability) {
+        setLiabilityClaimLevel(String(Math.min(10, 4 + claimInfo.count)));
+      }
+      if (aiRecommendation.hull) {
+        setCarDamageLevel(String(Math.min(6, 0 + claimInfo.count)));
+      }
+      levelSet = true;
+    } else if (!claimInfo.mentioned && carAge !== null) {
+      setLevel(String(Math.max(1, 4 - carAge)));
+      if (aiRecommendation.liability) {
+        setLiabilityClaimLevel(String(Math.max(1, 4 - carAge)));
+      }
+      if (aiRecommendation.hull) {
+        setCarDamageLevel(String(Math.max(-3, 0 - carAge)));
+      }
+      levelSet = true;
+    }
+    let duiSet = false;
+    if (duiInfo.count > 0) {
+      setDrunkCount(String(Math.min(10, duiInfo.count)));
+      duiSet = true;
+    }
+ 
+    const carInfoText = aiChatAnswers.carInfo || "";
+    let brandMatch = null;
+    if (carInfoText) {
+      brandMatch = findBrandMatch(carInfoText);
+      if (brandMatch) {
+        handleVChg(brandMatch.label);
+      }
+    }
+
+    setShowAiQuoteModal(false);
+
+    let msg = "✅ 已為您帶入建議的投保險種";
+    if (genderText) msg += "、性別";
+    if (birthdaySet) msg += "、生日";
+    if (manufactureSet) msg += "、製造年月";
+    if (levelSet) msg += "、肇事/賠款等級（依實際投保項目調整）";
+    if (duiSet) msg += "、酒駕次數";
+    if (brandMatch) msg += `，並自動選取廠牌車系「${brandMatch.label}」`;
+    msg += "，請確認車籍、生日與從人資料是否正確後，再進行試算喔！";
+
+    if (carInfoText && !brandMatch) {
+      msg += `\n\n⚠️ 系統在車型主檔中找不到與「${carInfoText}」對應的廠牌車系，請於下方「廠牌車系」下拉選單手動選取正確車型。`;
+    }
+    if (claimInfo.mentioned && !levelSet) {
+      msg += `\n\n⚠️ 系統偵測到您提到出險紀錄，但無法判斷確切次數，強制肇事等級／車責賠款等級／車體賠款等級請手動確認。`;
+    }
+    if (duiInfo.mentioned && !duiSet) {
+      msg += `\n\n⚠️ 系統偵測到您提到酒駕紀錄，但無法判斷確切次數，酒駕次數請手動確認。`;
+    }
+    alert(msg);
+  };
+ 
+  // 🎤 語音輸入（瀏覽器原生語音辨識，不支援的瀏覽器會提示改用打字）
+  const toggleAiMic = () => {
+    const SpeechRecognitionApi =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionApi) {
+      alert("⚠️ 您的瀏覽器不支援語音輸入，請直接用打字輸入喔！");
+      return;
+    }
+    if (aiListening) {
+      aiRecognitionRef.current && aiRecognitionRef.current.stop();
+      setAiListening(false);
+      return;
+    }
+    const recognition = new SpeechRecognitionApi();
+    recognition.lang = "zh-TW";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setAiChatInput((prev) => (prev ? prev + transcript : transcript));
+    };
+    recognition.onerror = () => setAiListening(false);
+    recognition.onend = () => setAiListening(false);
+    aiRecognitionRef.current = recognition;
+    setAiListening(true);
+    recognition.start();
+  };
   const [queryLoading, setQueryLoading] = useState(false);
   const openQueryModal = async (qid) => {
     setShowQueryModal(true);
@@ -1708,8 +2027,17 @@ export default function App() {
         📋 汽車險報價系統
       </h4>
 
-      <h6 className="fw-bold text-dark mb-2">👤 客戶基本資料</h6>
-      <div className="row g-3 bg-light p-3 rounded mb-4 border">
+      <div className="d-flex justify-content-between align-items-center mb-2">
+  <h6 className="fw-bold text-dark mb-0">👤 客戶基本資料</h6>
+  <button
+    type="button"
+    className="btn btn-sm btn-outline-primary fw-bold"
+    onClick={openAiQuoteModal}
+  >
+    🤖 AI快速報價
+  </button>
+</div>
+<div className="row g-3 bg-light p-3 rounded mb-4 border">
         <div className="col-4">
           姓名*
           <input
@@ -3295,6 +3623,169 @@ export default function App() {
                 返回經辦主頁
               </button>
             </div>
+          </div>
+        </div>
+      )}
+            {/* 🤖 AI快速報價彈窗（規則式問答版） */}
+            {showAiQuoteModal && (
+        <div
+          className="modal-backdrop-custom"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 100070,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            className="bg-white rounded shadow-lg p-3 d-flex flex-column"
+            style={{ width: "92%", maxWidth: "480px", maxHeight: "85vh" }}
+          >
+            <div className="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+              <h6 className="fw-bold mb-0 text-primary">🤖 AI快速報價小幫手</h6>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={() => setShowAiQuoteModal(false)}
+              ></button>
+            </div>
+ 
+            <div
+              className="flex-grow-1 overflow-auto mb-2 p-2 bg-light rounded"
+              style={{ minHeight: "260px" }}
+            >
+              {aiChatMessages.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={`d-flex mb-2 ${
+                    msg.role === "user" ? "justify-content-end" : "justify-content-start"
+                  }`}
+                >
+                  <div
+                    className={`p-2 rounded-3 small ${
+                      msg.role === "user"
+                        ? "bg-primary text-white"
+                        : "bg-white border text-dark"
+                    }`}
+                    style={{ maxWidth: "80%", whiteSpace: "pre-wrap" }}
+                  >
+                    {msg.text}
+                  </div>
+                </div>
+              ))}
+ 
+              {aiRecommendation && (
+                <div className="bg-white border rounded p-2 mt-2 small">
+                  <div className="fw-bold text-success mb-2">✅ 建議投保組合</div>
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      checked
+                      disabled
+                      readOnly
+                    />
+                    <label className="form-check-label">強制險（法定必保）</label>
+                  </div>
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      checked
+                      disabled
+                      readOnly
+                    />
+                    <label className="form-check-label">第三人責任險</label>
+                  </div>
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      checked={aiRecommendation.hull}
+                      onChange={() => toggleAiRecommendationItem("hull")}
+                    />
+                    <label className="form-check-label">車體險</label>
+                  </div>
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      checked={aiRecommendation.theft}
+                      onChange={() => toggleAiRecommendationItem("theft")}
+                    />
+                    <label className="form-check-label">竊盜險</label>
+                  </div>
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      checked={aiRecommendation.excess}
+                      onChange={() => toggleAiRecommendationItem("excess")}
+                    />
+                    <label className="form-check-label">超額責任險</label>
+                  </div>
+                  <div className="form-check mb-2">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      checked={aiRecommendation.passenger}
+                      onChange={() => toggleAiRecommendationItem("passenger")}
+                    />
+                    <label className="form-check-label">乘客險</label>
+                  </div>
+                  {aiRecommendation.note && (
+                    <div className="text-danger" style={{ fontSize: "0.8rem" }}>
+                      ⚠️ {aiRecommendation.note}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-success btn-sm w-100 fw-bold mt-2"
+                    onClick={applyAiRecommendationToForm}
+                  >
+                    帶入主頁繼續試算
+                  </button>
+                </div>
+              )}
+            </div>
+ 
+            {!aiRecommendation && (
+              <div className="d-flex gap-2">
+                <button
+                  type="button"
+                  className={`btn btn-sm ${
+                    aiListening ? "btn-danger" : "btn-outline-secondary"
+                  }`}
+                  onClick={toggleAiMic}
+                  title="語音輸入"
+                >
+                  {aiListening ? "🔴" : "🎤"}
+                </button>
+                <input
+                  type="text"
+                  className="form-control form-control-sm"
+                  placeholder="請輸入回答，或按🎤語音輸入"
+                  value={aiChatInput}
+                  onChange={(e) => setAiChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing) handleAiChatSend();
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm fw-bold"
+                  onClick={handleAiChatSend}
+                >
+                  送出
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
